@@ -1,56 +1,64 @@
-import { useEffect } from "react";
-import "@/App.css";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import axios from "axios";
-import { HOME } from "@/constants/testIds";
+import React from "react";
+import "./App.css";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Toaster } from "sonner";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
+import { AuthProvider } from "./lib/AuthContext";
+import ProtectedRoute from "./components/ProtectedRoute";
+import Layout from "./components/Layout";
 
-const Home = () => {
-  const helloWorldApi = async () => {
-    try {
-      const response = await axios.get(`${API}/`);
-      console.log(response.data.message);
-    } catch (e) {
-      console.error(e, `errored out requesting / api`);
-    }
-  };
+import Login from "./pages/Login";
+import Dashboard from "./pages/Dashboard";
+import VerifyPayment from "./pages/VerifyPayment";
+import PaymentDetail from "./pages/PaymentDetail";
+import InvoiceScanner from "./pages/InvoiceScanner";
+import Vendors from "./pages/Vendors";
+import VendorDetail from "./pages/VendorDetail";
+import Beneficiaries from "./pages/Beneficiaries";
+import Approvals from "./pages/Approvals";
+import FraudAlerts from "./pages/FraudAlerts";
+import IncidentRoom from "./pages/IncidentRoom";
+import IncidentDetail from "./pages/IncidentDetail";
+import Reports from "./pages/Reports";
+import AuditTrail from "./pages/AuditTrail";
+import Settings from "./pages/Settings";
+import CommDetector from "./pages/CommDetector";
+import VoiceVerification from "./pages/VoiceVerification";
 
-  useEffect(() => {
-    helloWorldApi();
-  }, []);
-
+function Shell({ children }) {
   return (
-    <div>
-      <header className="App-header">
-        <a
-          data-testid={HOME.emergentLink}
-          className="App-link"
-          href="https://emergent.sh"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <img src="https://avatars.githubusercontent.com/in/1201222?s=120&u=2686cf91179bbafbc7a71bfbc43004cf9ae1acea&v=4" />
-        </a>
-        <p className="mt-5">Building something incredible ~!</p>
-      </header>
-    </div>
-  );
-};
-
-function App() {
-  return (
-    <div className="App">
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Home />}>
-            <Route index element={<Home />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </div>
+    <ProtectedRoute>
+      <Layout>{children}</Layout>
+    </ProtectedRoute>
   );
 }
 
-export default App;
+export default function App() {
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <Toaster position="top-right" richColors theme="dark" />
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/" element={<Shell><Dashboard /></Shell>} />
+          <Route path="/verify" element={<Shell><VerifyPayment /></Shell>} />
+          <Route path="/verify/:id" element={<Shell><PaymentDetail /></Shell>} />
+          <Route path="/scanner" element={<Shell><InvoiceScanner /></Shell>} />
+          <Route path="/vendors" element={<Shell><Vendors /></Shell>} />
+          <Route path="/vendors/:id" element={<Shell><VendorDetail /></Shell>} />
+          <Route path="/beneficiaries" element={<Shell><Beneficiaries /></Shell>} />
+          <Route path="/approvals" element={<Shell><Approvals /></Shell>} />
+          <Route path="/alerts" element={<Shell><FraudAlerts /></Shell>} />
+          <Route path="/incidents" element={<Shell><IncidentRoom /></Shell>} />
+          <Route path="/incidents/:id" element={<Shell><IncidentDetail /></Shell>} />
+          <Route path="/comms" element={<Shell><CommDetector /></Shell>} />
+          <Route path="/voice" element={<Shell><VoiceVerification /></Shell>} />
+          <Route path="/reports" element={<Shell><Reports /></Shell>} />
+          <Route path="/audit" element={<Shell><AuditTrail /></Shell>} />
+          <Route path="/settings" element={<Shell><Settings /></Shell>} />
+          <Route path="*" element={<Navigate to="/" />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
+  );
+}
