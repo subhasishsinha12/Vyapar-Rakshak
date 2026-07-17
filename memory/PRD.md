@@ -56,3 +56,29 @@ Business Owner · Finance Manager · Payment Maker · Payment Checker · Procure
 - ERP / Tally / Zoho Books / Vyapar app connectors.
 - PDF report generation (currently JSON + CSV).
 - SSO (Google Workspace) via Emergent Google Auth.
+
+## Implemented (2026-07-17) – V2
+- **Adapter scaffolding**: `GSTAdapter`, `BankAdapter`, `DeepfakeAdapter` protocols with drop-in providers Karza + ClearTax (GST), Razorpay + Cashfree (bank penny-drop), Reality Defender + Pindrop (deepfake). Registry singleton hot-swaps live/mock at runtime.
+- **Admin Integrations screen** at `/integrations` (owner/admin only): provider selector, masked secrets, one-click test-call per adapter, status chips showing live/mock.
+- **Vendor Trust Passport** now has one-click GST verify + per-account penny-drop with match verdict.
+- **Voice screening** now routed through the DeepfakeAdapter registry (previously stubbed).
+- **Vendor self-service portal** at `/vendor` (VendorLayout): Overview (trust score, KYC state), KYC upload (7 document kinds, 5 MB limit, review workflow), My Payments (status view), Bank Change request (goes through same callback/cooling workflow).
+- Vendor role auto-redirects to `/vendor` on login (no access to buyer app).
+- `vendor@textilepro.in` seeded and linked to TextilePro Mills Pvt Ltd (idempotent on restart).
+- **PDF exports** for all 8 reports via `?format=pdf` — shared ReportLab template with brand header, Indian rupee formatting, letterhead, table styling, page numbers.
+- One critical UI bug in VendorDetail.jsx auto-fixed by testing agent (missing useState + icon imports).
+
+## Testing
+- **Iteration 2 regression**: 55/55 pytest passing (25 iter-1 + 30 iter-2 for adapters, vendor portal, PDF exports). Frontend flows verified for Integrations, PDF download, vendor KYC upload, vendor bank change, VendorDetail verify buttons.
+
+## Backlog (P1)
+- Wire real provider keys once obtained (Karza / Cashfree / Reality Defender contracts).
+- Vendor portal messaging (Resend adapter for callback prompts + KYC review notifications).
+- Object storage (Emergent Object Storage) for KYC files instead of local disk.
+- PDF signing (digital signature via DocuSign / eMudhra) on incident evidence packs.
+
+## Backlog (P2)
+- ERP / Tally / Zoho Books / Vyapar app connectors.
+- ML-based anomaly detection over historical payments.
+- Emergent Google Auth SSO for buyer admin roles.
+- Multi-tenant / multi-org data isolation.
