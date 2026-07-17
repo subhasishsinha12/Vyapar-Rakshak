@@ -3,7 +3,7 @@ import { Link, NavLink, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, ShieldCheck, ScanLine, Users, Wallet, CheckSquare,
   Bell, AlertOctagon, FileBarChart, ScrollText, Settings, LogOut,
-  Search, Menu, X, Radio, MessageSquareWarning, Mic2,
+  Search, Menu, X, Radio, MessageSquareWarning, Mic2, Plug,
 } from "lucide-react";
 import { useAuth } from "../lib/AuthContext";
 import { http } from "../lib/api";
@@ -21,6 +21,7 @@ const NAV = [
   { to: "/voice", label: "Voice Verify", icon: Mic2, id: "nav-voice" },
   { to: "/reports", label: "Reports", icon: FileBarChart, id: "nav-reports" },
   { to: "/audit", label: "Audit Trail", icon: ScrollText, id: "nav-audit" },
+  { to: "/integrations", label: "Integrations", icon: Plug, id: "nav-integrations" },
   { to: "/settings", label: "Settings", icon: Settings, id: "nav-settings" },
 ];
 

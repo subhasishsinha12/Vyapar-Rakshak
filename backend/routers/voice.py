@@ -1,14 +1,15 @@
-"""Voice / video advisory verification (prototype)."""
+"""Voice / video verification – uses the DeepfakeAdapter registry."""
 import uuid
-import random
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, File, UploadFile, HTTPException
 
 from deps import get_db, get_current_user
+from adapters import registry
 
 router = APIRouter(prefix="/voice", tags=["voice"])
 
 ALLOWED = {"audio/wav", "audio/mpeg", "audio/mp3", "audio/mp4", "audio/webm",
+           "audio/x-wav", "audio/ogg",
            "video/mp4", "video/webm", "video/quicktime"}
 
 
@@ -18,26 +19,28 @@ async def analyze_voice(file: UploadFile = File(...),
     if file.content_type not in ALLOWED:
         raise HTTPException(400, f"Unsupported media type: {file.content_type}")
     data = await file.read()
-    # Simulated advisory analysis
-    # In production this would call a deepfake / speaker verification service.
-    synthetic_score = random.randint(35, 82)
-    replay_score = random.randint(10, 60)
-    speaker_consistency = round(random.uniform(0.42, 0.95), 2)
-    metadata_ok = len(data) > 5000
+    if not data:
+        raise HTTPException(400, "Empty file")
+
+    signals = await registry.deepfake.screen(data, file.content_type)
+
     result = {
         "id": str(uuid.uuid4()),
         "filename": file.filename, "mime": file.content_type, "size": len(data),
-        "synthetic_media_score": synthetic_score,
-        "replay_risk_score": replay_score,
-        "speaker_consistency": speaker_consistency,
-        "metadata_anomalies": [] if metadata_ok else ["truncated_or_missing_metadata"],
+        "provider": signals.get("provider"),
+        "simulated": signals.get("simulated", False),
+        "synthetic_media_score": signals.get("synthetic_media_score"),
+        "replay_risk_score": signals.get("replay_risk_score"),
+        "speaker_consistency": signals.get("speaker_consistency"),
+        "metadata_anomalies": signals.get("metadata_anomalies") or [],
+        "verdict": signals.get("verdict"),
         "challenge_response_status": "not_performed",
         "independent_verification_status": "pending",
         "advisory_note": ("Deepfake screening is an advisory signal only. Always confirm with an "
                           "independent callback on a previously known number before releasing payment."),
+        "raw_error": signals.get("error"),
         "created_at": datetime.now(timezone.utc).isoformat(),
         "created_by": user["id"],
-        "simulated": True,
     }
     await db.voice_scans.insert_one(result)
     result.pop("_id", None)

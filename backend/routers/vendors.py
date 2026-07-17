@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from deps import get_db, get_current_user
+from adapters import registry
 
 router = APIRouter(prefix="/vendors", tags=["vendors"])
 
@@ -79,3 +80,55 @@ async def block_vendor(vendor_id: str, reason: dict, db=Depends(get_db), user=De
         "reason": reason.get("reason"),
     })
     return {"ok": True}
+
+
+@router.post("/{vendor_id}/verify-gst")
+async def verify_gst(vendor_id: str, db=Depends(get_db), user=Depends(get_current_user)):
+    v = await db.vendors.find_one({"id": vendor_id})
+    if not v:
+        raise HTTPException(404, "Vendor not found")
+    result = await registry.gst.verify(v.get("gstin") or "")
+    now = datetime.now(timezone.utc).isoformat()
+    await db.vendors.update_one({"id": vendor_id},
+        {"$set": {"gst_verification": {"result": result, "checked_at": now,
+                                        "checked_by": user["name"]}}})
+    await db.audit_trail.insert_one({
+        "id": str(uuid.uuid4()),
+        "user_id": user["id"], "user_name": user["name"], "user_role": user["role"],
+        "timestamp": now, "device": "web", "ip": "10.0.0.1",
+        "action": "vendor.gst_verify", "entity_type": "vendor", "entity_id": vendor_id,
+        "previous": None, "new": {"provider": result.get("provider"), "ok": result.get("ok")},
+        "reason": "GST verification via adapter",
+    })
+    return result
+
+
+class BankCheckIn(BaseModel):
+    account_number: str
+    ifsc: str
+    expected_name: Optional[str] = None
+
+
+@router.post("/{vendor_id}/verify-bank")
+async def verify_bank(vendor_id: str, body: BankCheckIn,
+                      db=Depends(get_db), user=Depends(get_current_user)):
+    v = await db.vendors.find_one({"id": vendor_id})
+    if not v:
+        raise HTTPException(404, "Vendor not found")
+    result = await registry.bank.penny_drop(
+        body.account_number, body.ifsc,
+        expected_name=body.expected_name or v.get("name"),
+    )
+    now = datetime.now(timezone.utc).isoformat()
+    await db.audit_trail.insert_one({
+        "id": str(uuid.uuid4()),
+        "user_id": user["id"], "user_name": user["name"], "user_role": user["role"],
+        "timestamp": now, "device": "web", "ip": "10.0.0.1",
+        "action": "vendor.bank_verify", "entity_type": "vendor", "entity_id": vendor_id,
+        "previous": None,
+        "new": {"provider": result.get("provider"),
+                "verdict": result.get("verdict"),
+                "name_match_score": result.get("name_match_score")},
+        "reason": "Beneficiary penny-drop / name match",
+    })
+    return result

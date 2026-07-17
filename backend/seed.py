@@ -190,7 +190,16 @@ DEMO_PAYMENTS_TEMPLATES = [
 async def seed_all(db):
     """Idempotent seed. Populates vendors, invoices, payments, comms, incidents,
     beneficiary changes and audit entries."""
+
+    # Always ensure vendor user is linked (idempotent)
+    async def _link_vendor_user():
+        textile = await db.vendors.find_one({"name": "TextilePro Mills Pvt Ltd"}, {"id": 1})
+        if textile:
+            await db.users.update_one({"email": "vendor@textilepro.in"},
+                                       {"$set": {"vendor_id": textile["id"]}})
+
     if await db.vendors.count_documents({}) >= len(VENDORS):
+        await _link_vendor_user()
         return  # already seeded
 
     now = datetime.now(timezone.utc)
@@ -202,6 +211,24 @@ async def seed_all(db):
         v_doc = {**v, "id": vid, "created_at": _iso(now)}
         await db.vendors.insert_one(v_doc)
         vendor_map[v["name"]] = vid
+
+    # Link the seeded vendor user to TextilePro Mills
+    textile_id = vendor_map.get("TextilePro Mills Pvt Ltd")
+    if textile_id:
+        await db.users.update_one({"email": "vendor@textilepro.in"},
+                                   {"$set": {"vendor_id": textile_id}})
+        await db.vendor_kyc.insert_one({
+            "id": str(uuid.uuid4()),
+            "vendor_id": textile_id, "vendor_name": "TextilePro Mills Pvt Ltd",
+            "kind": "gst_certificate", "notes": "GST certificate (seed sample)",
+            "filename": "textilepro-gst.pdf", "mime": "application/pdf", "size": 128456,
+            "storage_path": "seed://placeholder",
+            "uploaded_by": None, "uploaded_by_name": "Arjun Patel",
+            "uploaded_at": _iso(now - timedelta(days=180)),
+            "status": "approved",
+            "reviewed_by": "Anita Sharma",
+            "reviewed_at": _iso(now - timedelta(days=178)),
+        })
 
     # ---- payments (build 30+ items)
     payments = list(DEMO_PAYMENTS_TEMPLATES)

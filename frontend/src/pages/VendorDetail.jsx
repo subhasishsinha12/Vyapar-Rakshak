@@ -4,11 +4,14 @@ import { http } from "../lib/api";
 import { formatINR, maskAccount, fromNow } from "../lib/format";
 import RiskBadge from "../components/RiskBadge";
 import { toast } from "sonner";
-import { ArrowLeft, Ban } from "lucide-react";
+import { ArrowLeft, Ban, ShieldCheck, Landmark } from "lucide-react";
 
 export default function VendorDetail() {
   const { id } = useParams();
   const [v, setV] = useState(null);
+  const [gst, setGst] = useState(null);
+  const [bankChecks, setBankChecks] = useState({});
+  const [busy, setBusy] = useState(null);
 
   async function load() {
     const { data } = await http.get(`/vendors/${id}`);
@@ -25,6 +28,30 @@ export default function VendorDetail() {
       toast.success("Vendor blocked");
       load();
     } catch (_) { toast.error("Failed"); }
+  }
+
+  async function verifyGst() {
+    setBusy("gst");
+    try {
+      const { data } = await http.post(`/vendors/${id}/verify-gst`);
+      setGst({ result: data, checked_at: new Date().toISOString() });
+      if (data.ok) toast.success(`GST verified via ${data.provider}${data.simulated ? " (simulated)" : ""}`);
+      else toast.error(data.error || "GST verification failed");
+    } catch (_) { toast.error("Failed"); }
+    setBusy(null);
+  }
+
+  async function verifyBank(acc) {
+    const key = acc.account_number;
+    setBusy(`bank-${key}`);
+    try {
+      const { data } = await http.post(`/vendors/${id}/verify-bank`,
+        { account_number: acc.account_number, ifsc: acc.ifsc, expected_name: v.name });
+      setBankChecks((s) => ({ ...s, [key]: data }));
+      if (data.ok) toast.success(`Bank check ${data.verdict} via ${data.provider}${data.simulated ? " (simulated)" : ""}`);
+      else toast.error(data.error || "Bank verification failed");
+    } catch (_) { toast.error("Failed"); }
+    setBusy(null);
   }
 
   if (!v) return <div className="text-muted-foreground">Loading vendor passport…</div>;
@@ -46,9 +73,27 @@ export default function VendorDetail() {
             <h1 className="font-display text-3xl font-semibold tracking-tight">{v.name}</h1>
             <div className="mt-1 text-xs text-muted-foreground">GSTIN {v.gstin} · PAN {v.pan}</div>
             <div className="mt-1 max-w-xl text-xs text-muted-foreground">{v.address}</div>
+            {gst?.result && (
+              <div className="mt-3 rounded-md border border-white/10 bg-white/5 p-3 text-xs">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className={`h-3.5 w-3.5 ${gst.result.ok ? "text-emerald-400" : "text-rose-400"}`} />
+                  <span className="font-medium">GST · {gst.result.provider}{gst.result.simulated ? " (simulated)" : ""}</span>
+                </div>
+                <div className="mt-1 grid grid-cols-2 gap-2 md:grid-cols-3">
+                  <span className="text-muted-foreground">Legal name: <span className="text-foreground">{gst.result.legal_name || "—"}</span></span>
+                  <span className="text-muted-foreground">Status: <span className="text-foreground">{gst.result.status || "—"}</span></span>
+                  <span className="text-muted-foreground">Filing: <span className="text-foreground">{gst.result.filing_status || "—"}</span></span>
+                </div>
+              </div>
+            )}
           </div>
           <div className="flex flex-col items-end gap-2">
             <RiskBadge category={trustCat} score={v.trust_score} />
+            <button data-testid="verify-gst" onClick={verifyGst} disabled={busy === "gst"}
+                    className="rounded-full border border-blue-500/30 bg-blue-500/10 px-3 py-1 text-xs text-blue-300 hover:border-blue-500/50 disabled:opacity-50">
+              <ShieldCheck className="mr-1 inline h-3 w-3" />
+              {busy === "gst" ? "Verifying…" : "Verify GST via adapter"}
+            </button>
             {!v.blocked && (
               <button data-testid="block-vendor" onClick={block}
                       className="rounded-full border border-rose-500/30 bg-rose-500/10 px-3 py-1 text-xs text-rose-300 hover:border-rose-500/50">
@@ -75,13 +120,40 @@ export default function VendorDetail() {
         <div className="card-elev p-5">
           <h3 className="font-display text-sm font-semibold uppercase tracking-widest">Approved bank accounts</h3>
           <div className="mt-3 space-y-2">
-            {(v.approved_bank_accounts || []).map((a, i) => (
-              <div key={i} className="rounded-md border border-emerald-500/20 bg-emerald-500/5 p-2 text-xs">
-                <div className="font-medium">{a.bank}</div>
-                <div>{maskAccount(a.account_number)} · {a.ifsc}</div>
-                <div className="text-muted-foreground">Verified {fromNow(a.verified_at)}</div>
-              </div>
-            ))}
+            {(v.approved_bank_accounts || []).map((a, i) => {
+              const check = bankChecks[a.account_number];
+              return (
+                <div key={i} className="rounded-md border border-emerald-500/20 bg-emerald-500/5 p-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-medium">{a.bank}</div>
+                      <div>{maskAccount(a.account_number)} · {a.ifsc}</div>
+                      <div className="text-muted-foreground">Verified {fromNow(a.verified_at)}</div>
+                    </div>
+                    <button onClick={() => verifyBank(a)} disabled={busy === `bank-${a.account_number}`}
+                            data-testid={`verify-bank-${i}`}
+                            className="rounded-full border border-blue-500/30 bg-blue-500/10 px-2 py-1 text-[10px] text-blue-300 hover:border-blue-500/50 disabled:opacity-50">
+                      <Landmark className="mr-1 inline h-3 w-3" />
+                      {busy === `bank-${a.account_number}` ? "Checking…" : "Penny-drop"}
+                    </button>
+                  </div>
+                  {check && (
+                    <div className="mt-2 rounded border border-white/10 bg-black/30 p-2">
+                      <div className="flex items-center justify-between">
+                        <div>Name at bank: <span className="text-foreground">{check.name_at_bank || "—"}</span></div>
+                        <span className={`rounded-full px-2 py-0.5 uppercase ${
+                          check.verdict === "match" ? "bg-emerald-500/10 text-emerald-300" :
+                          check.verdict === "partial" ? "bg-amber-500/10 text-amber-300" :
+                          "bg-rose-500/10 text-rose-300"}`}>{check.verdict}</span>
+                      </div>
+                      <div className="text-muted-foreground">
+                        Provider: {check.provider}{check.simulated ? " (simulated)" : ""} · match score {check.name_match_score ?? "—"}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
             {v.recent_account_change_at && (
               <div className="rounded-md border border-rose-500/30 bg-rose-500/10 p-2 text-xs text-rose-300">
                 ⚠ Recent change {fromNow(v.recent_account_change_at)} — pending independent callback

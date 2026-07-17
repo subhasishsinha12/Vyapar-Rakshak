@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { http } from "../lib/api";
+import { http, API } from "../lib/api";
 import { formatINR, fromNow } from "../lib/format";
-import { Download, FileBarChart } from "lucide-react";
+import { Download, FileBarChart, FileText } from "lucide-react";
 import { toast } from "sonner";
 
 const REPORTS = [
@@ -49,6 +49,20 @@ export default function Reports() {
     URL.revokeObjectURL(a.href);
   }
 
+  async function pdf() {
+    if (!active) return;
+    try {
+      const res = await http.get(`/reports/${active}`, {
+        params: { format: "pdf" }, responseType: "blob",
+      });
+      const blob = new Blob([res.data], { type: "application/pdf" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `${active}.pdf`; a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (_) { toast.error("PDF download failed"); }
+  }
+
   return (
     <div className="space-y-5">
       <div>
@@ -77,6 +91,10 @@ export default function Reports() {
               {REPORTS.find((x) => x.key === active).title}
             </div>
             <div className="flex gap-2">
+              <button onClick={pdf} data-testid="dl-pdf"
+                      className="rounded-full border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs text-rose-200 hover:border-rose-500/50">
+                <FileText className="mr-1 inline h-3.5 w-3.5" /> PDF
+              </button>
               <button onClick={download} data-testid="dl-json"
                       className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs hover:border-blue-500/40">
                 <Download className="mr-1 inline h-3.5 w-3.5" /> JSON
