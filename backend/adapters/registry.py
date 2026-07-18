@@ -6,6 +6,7 @@ from typing import Optional
 from .gst import MockGSTAdapter, KarzaGSTAdapter, ClearTaxGSTAdapter
 from .bank import MockBankAdapter, RazorpayBankAdapter, CashfreeBankAdapter
 from .deepfake import MockDeepfakeAdapter, RealityDefenderAdapter, PindropAdapter
+from .mobile_risk import MockMobileRiskAdapter, CashfreeMobileRiskAdapter, SignzyMobileRiskAdapter
 
 logger = logging.getLogger("adapters.registry")
 
@@ -15,6 +16,7 @@ class Registry:
         self.gst = MockGSTAdapter()
         self.bank = MockBankAdapter()
         self.deepfake = MockDeepfakeAdapter()
+        self.mobile_risk = MockMobileRiskAdapter()
         self._config: dict = {}
 
     def snapshot(self) -> dict:
@@ -28,6 +30,9 @@ class Registry:
             "deepfake": {"provider": self.deepfake.provider,
                          "live": getattr(self.deepfake, "live", False),
                          "available_providers": ["mock", "reality_defender", "pindrop"]},
+            "mobile_risk": {"provider": self.mobile_risk.provider,
+                            "live": getattr(self.mobile_risk, "live", False),
+                            "available_providers": ["mock", "cashfree", "signzy"]},
         }
 
     def configure(self, cfg: dict):
@@ -62,6 +67,16 @@ class Registry:
             self.deepfake = PindropAdapter(d["api_key"])
         else:
             self.deepfake = MockDeepfakeAdapter()
+
+        # Mobile risk (FRI lineage)
+        m = self._config.get("mobile_risk") or {}
+        mp = m.get("provider", "mock")
+        if mp == "cashfree" and m.get("api_key"):
+            self.mobile_risk = CashfreeMobileRiskAdapter(m["api_key"])
+        elif mp == "signzy" and m.get("api_key"):
+            self.mobile_risk = SignzyMobileRiskAdapter(m["api_key"])
+        else:
+            self.mobile_risk = MockMobileRiskAdapter()
 
         logger.info(f"Adapters configured: {self.snapshot()}")
 

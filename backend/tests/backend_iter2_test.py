@@ -47,7 +47,7 @@ class TestIntegrations:
         assert r.status_code == 200
         d = r.json()
         snap = d.get("snapshot", d)
-        for k in ("gst", "bank", "deepfake"):
+        for k in ("gst", "bank", "deepfake", "mobile_risk"):
             assert k in snap, f"missing {k} in snapshot: {snap}"
             assert snap[k].get("provider") == "mock"
             assert isinstance(snap[k].get("available_providers"), list) and snap[k]["available_providers"]
@@ -61,6 +61,7 @@ class TestIntegrations:
             "gst": {"provider": "mock"},
             "bank": {"provider": "mock"},
             "deepfake": {"provider": "mock"},
+            "mobile_risk": {"provider": "mock"},
         }
         r = owner_s.put(f"{API}/settings/integrations", json=body)
         assert r.status_code == 200, r.text
@@ -86,6 +87,14 @@ class TestIntegrations:
     def test_test_deepfake(self, owner_s):
         r = owner_s.post(f"{API}/settings/integrations/test/deepfake", json={})
         assert r.status_code == 200, r.text
+
+    def test_test_mobile_risk(self, owner_s):
+        r = owner_s.post(f"{API}/settings/integrations/test/mobile_risk", json={})
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert d.get("provider") == "mock"
+        assert d.get("risk_level") in ("low", "medium", "high", "very_high")
+        assert d.get("recommendation") in ("allow", "warn", "block")
 
 
 # ---------- Vendor adapter routes on vendors ----------

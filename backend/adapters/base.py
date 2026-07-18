@@ -34,3 +34,23 @@ class DeepfakeAdapter(Protocol):
                     speaker_consistency, metadata_anomalies, verdict, error?,
                     simulated}."""
         ...
+
+
+class MobileRiskAdapter(Protocol):
+    provider: str
+
+    async def check(self, mobile_number: str) -> Dict[str, Any]:
+        """Return {ok, provider, mobile_number_masked, risk_level, risk_score,
+                    sources, recommendation, error?, simulated}.
+
+        risk_level: "low" | "medium" | "high" | "very_high" | "unknown"
+        recommendation: "allow" | "warn" | "block"
+
+        Mirrors DoT's Financial Fraud Risk Indicator (FRI) classification —
+        Medium/High/Very High risk mobile numbers, sourced from NCRP, Chakshu
+        and bank-reported intelligence. Live providers wrap FRI-derived
+        signals via a licensed intermediary (e.g. a payment aggregator's
+        risk API); VyaparRakshak is not itself a bank/NBFC/PSP and has no
+        direct RBI/DoT API access.
+        """
+        ...

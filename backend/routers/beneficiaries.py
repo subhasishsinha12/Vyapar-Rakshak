@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from deps import get_db, get_current_user
 from routers.webhooks import fabric
+from adapters import registry
 
 router = APIRouter(prefix="/beneficiary-changes", tags=["beneficiaries"])
 
@@ -19,6 +20,7 @@ class BeneficiaryChangeIn(BaseModel):
     new_bank: Optional[str] = None
     requested_via: str = "email"
     requested_email_domain: Optional[str] = None
+    requested_contact_phone: Optional[str] = None
 
 
 @router.get("")
@@ -46,6 +48,13 @@ async def create_change(body: BeneficiaryChangeIn,
     existing_domains = [c.get("email", "").split("@")[-1] for c in v.get("contacts", [])]
     if body.requested_email_domain and body.requested_email_domain not in existing_domains:
         flags.append("email_domain_mismatch")
+
+    mobile_risk = None
+    if body.requested_contact_phone:
+        mobile_risk = await registry.mobile_risk.check(body.requested_contact_phone)
+        if mobile_risk.get("recommendation") in ("warn", "block"):
+            flags.append("mobile_number_high_risk")
+
     doc = {
         "id": str(uuid.uuid4()),
         "vendor_id": v["id"], "vendor_name": v["name"],
@@ -56,6 +65,8 @@ async def create_change(body: BeneficiaryChangeIn,
         "new_bank": body.new_bank,
         "requested_via": body.requested_via,
         "requested_email_domain": body.requested_email_domain,
+        "requested_contact_phone": body.requested_contact_phone,
+        "mobile_risk": mobile_risk,
         "flags": flags,
         "callback_status": "pending",
         "verification_code": f"VR-{random.randint(100000, 999999)}",

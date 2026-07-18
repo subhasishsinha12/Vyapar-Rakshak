@@ -6,6 +6,7 @@ import { Plug, TestTube2, CheckCircle2, Circle } from "lucide-react";
 const GST_PROVIDERS = ["mock", "karza", "cleartax"];
 const BANK_PROVIDERS = ["mock", "razorpay", "cashfree"];
 const DEEPFAKE_PROVIDERS = ["mock", "reality_defender", "pindrop"];
+const MOBILE_RISK_PROVIDERS = ["mock", "cashfree", "signzy"];
 
 export default function Integrations() {
   const [snap, setSnap] = useState(null);
@@ -13,6 +14,7 @@ export default function Integrations() {
     gst: { provider: "mock", api_key: "" },
     bank: { provider: "mock", key_id: "", key_secret: "", client_id: "", client_secret: "" },
     deepfake: { provider: "mock", api_key: "" },
+    mobile_risk: { provider: "mock", api_key: "" },
   });
   const [busy, setBusy] = useState(false);
   const [tests, setTests] = useState({});
@@ -29,6 +31,7 @@ export default function Integrations() {
           key_id: "", key_secret: "", client_id: "", client_secret: "",
         },
         deepfake: { provider: data.config?.deepfake?.provider || "mock", api_key: "" },
+        mobile_risk: { provider: data.config?.mobile_risk?.provider || "mock", api_key: "" },
       }));
     } catch (e) {
       toast.error(e.response?.data?.detail || "Only admin / owner can view integrations");
@@ -43,6 +46,7 @@ export default function Integrations() {
         gst: cleanBlanks(config.gst),
         bank: cleanBlanks(config.bank),
         deepfake: cleanBlanks(config.deepfake),
+        mobile_risk: cleanBlanks(config.mobile_risk),
       };
       const { data } = await http.put("/settings/integrations", payload);
       setSnap(data.snapshot);
@@ -73,10 +77,11 @@ export default function Integrations() {
       </div>
 
       {snap && (
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
           <StatusChip name="GST" info={snap.gst} testId="chip-gst" />
           <StatusChip name="Bank verify" info={snap.bank} testId="chip-bank" />
           <StatusChip name="Deepfake" info={snap.deepfake} testId="chip-deepfake" />
+          <StatusChip name="Mobile risk" info={snap.mobile_risk} testId="chip-mobile-risk" />
         </div>
       )}
 
@@ -136,6 +141,22 @@ export default function Integrations() {
             <SecretInput label="API key" testId="df-key"
                          value={config.deepfake.api_key}
                          onChange={(v) => setConfig({ ...config, deepfake: { ...config.deepfake, api_key: v }})} />
+          )}
+        </div>
+      </Section>
+
+      {/* Mobile risk */}
+      <Section title="Mobile number risk (Fraud Risk Indicator)"
+               subtitle="Checks beneficiary contact numbers against DoT's FRI lineage before a bank-account change clears"
+               kind="mobile_risk" onTest={runTest} test={tests.mobile_risk}>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <ProviderSelect testId="mr-provider" options={MOBILE_RISK_PROVIDERS}
+                          value={config.mobile_risk.provider}
+                          onChange={(v) => setConfig({ ...config, mobile_risk: { ...config.mobile_risk, provider: v }})} />
+          {config.mobile_risk.provider !== "mock" && (
+            <SecretInput label="API key" testId="mr-key"
+                         value={config.mobile_risk.api_key}
+                         onChange={(v) => setConfig({ ...config, mobile_risk: { ...config.mobile_risk, api_key: v }})} />
           )}
         </div>
       </Section>
