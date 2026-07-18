@@ -25,6 +25,7 @@ from routers.approvals import router as approvals_router
 from routers.notifications import router as notif_router
 from routers.vendor_portal import router as vendor_portal_router
 from routers.settings import router as settings_router, bootstrap_integrations
+from routers.webhooks import router as webhooks_router
 from seed import seed_all
 from deps import get_db_conn
 
@@ -54,7 +55,7 @@ async def health():
 for r in (auth_router, dashboard_router, vendors_router, payments_router, invoices_router,
           ben_router, incidents_router, comms_router, voice_router, audit_router,
           reports_router, approvals_router, notif_router,
-          vendor_portal_router, settings_router):
+          vendor_portal_router, settings_router, webhooks_router):
     api.include_router(r)
 
 app.include_router(api)

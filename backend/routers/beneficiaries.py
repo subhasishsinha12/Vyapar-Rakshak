@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from deps import get_db, get_current_user
+from routers.webhooks import fabric
 
 router = APIRouter(prefix="/beneficiary-changes", tags=["beneficiaries"])
 
@@ -99,6 +100,11 @@ async def decide_change(change_id: str, body: ChangeDecisionIn,
                     "ifsc": doc["new_ifsc"], "bank": doc.get("new_bank") or "",
                     "verified_at": now}},
                  "$unset": {"recent_account_change_at": ""}})
+            await fabric.publish("beneficiary.changed", {
+                "vendor_id": doc["vendor_id"], "vendor_name": doc["vendor_name"],
+                "new_account_number": doc["new_account_number"], "new_ifsc": doc["new_ifsc"],
+                "change_id": change_id,
+            })
     elif body.action == "reject":
         update["status"] = "rejected"
     await db.beneficiary_changes.update_one({"id": change_id}, {"$set": update})

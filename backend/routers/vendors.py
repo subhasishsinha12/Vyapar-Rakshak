@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from deps import get_db, get_current_user
 from adapters import registry
+from routers.webhooks import fabric
 
 router = APIRouter(prefix="/vendors", tags=["vendors"])
 
@@ -78,6 +79,10 @@ async def block_vendor(vendor_id: str, reason: dict, db=Depends(get_db), user=De
         "action": "vendor.block", "entity_type": "vendor", "entity_id": vendor_id,
         "previous": {"blocked": False}, "new": {"blocked": True},
         "reason": reason.get("reason"),
+    })
+    await fabric.publish("vendor.blocked", {
+        "vendor_id": vendor_id, "vendor_name": v.get("name"),
+        "reason": reason.get("reason", "Blocked internally"),
     })
     return {"ok": True}
 
