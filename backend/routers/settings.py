@@ -31,10 +31,16 @@ class DeepfakeCfg(BaseModel):
     api_key: Optional[str] = None
 
 
+class MobileRiskCfg(BaseModel):
+    provider: str = "mock"     # mock | cashfree | signzy
+    api_key: Optional[str] = None
+
+
 class IntegrationsIn(BaseModel):
     gst: GstCfg
     bank: BankCfg
     deepfake: DeepfakeCfg
+    mobile_risk: MobileRiskCfg = MobileRiskCfg()
 
 
 def _mask(s: Optional[str]) -> Optional[str]:
@@ -45,7 +51,7 @@ def _mask(s: Optional[str]) -> Optional[str]:
 
 def _mask_cfg(cfg: dict) -> dict:
     out = {}
-    for k in ("gst", "bank", "deepfake"):
+    for k in ("gst", "bank", "deepfake", "mobile_risk"):
         v = dict(cfg.get(k) or {})
         for keyname in ("api_key", "key_secret", "client_secret"):
             if v.get(keyname):
@@ -87,6 +93,7 @@ async def put_integrations(body: IntegrationsIn,
         "gst": body.gst.model_dump(),
         "bank": body.bank.model_dump(),
         "deepfake": body.deepfake.model_dump(),
+        "mobile_risk": body.mobile_risk.model_dump(),
     }
     # Merge: if a secret field is None, preserve the existing one (so masked reads don't wipe).
     for k, v in new_cfg.items():
@@ -117,4 +124,6 @@ async def test_integration(kind: str, db=Depends(get_db), user=Depends(get_curre
         return await registry.bank.penny_drop("50100234567890", "HDFC0000123", "TextilePro Mills Pvt Ltd")
     if kind == "deepfake":
         return await registry.deepfake.screen(b"\x00" * 6000, "audio/wav")
+    if kind == "mobile_risk":
+        return await registry.mobile_risk.check("9876543210")
     raise HTTPException(400, "Unknown integration kind")

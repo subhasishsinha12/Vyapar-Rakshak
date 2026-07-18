@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from deps import get_db, get_current_user
+from routers.webhooks import fabric
 
 router = APIRouter(prefix="/incidents", tags=["incidents"])
 
@@ -65,6 +66,11 @@ async def create_incident(body: IncidentIn,
         "created_at": now,
     }
     await db.incidents.insert_one(doc)
+    await fabric.publish("incident.opened", {
+        "incident_id": doc["id"], "incident_no": doc["incident_no"],
+        "payment_id": doc["payment_id"], "amount_at_risk": doc["amount_at_risk"],
+        "suspected_type": doc["suspected_type"],
+    })
     doc.pop("_id", None)
     return doc
 
@@ -89,6 +95,10 @@ async def incident_action(incident_id: str, body: IncidentUpdateIn,
                 await db.vendors.update_one({"id": p["vendor_id"]},
                                              {"$set": {"blocked": True,
                                                        "block_reason": "Fraud incident"}})
+                await fabric.publish("vendor.blocked", {
+                    "vendor_id": p["vendor_id"], "vendor_name": p.get("vendor_name"),
+                    "reason": "Fraud incident", "incident_id": incident_id,
+                })
         push_timeline = {"at": now, "event": f"Beneficiary blocked internally by {user['name']}"}
     elif body.action == "notify_bank":
         update["bank_notification_status"] = "sent"

@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from deps import get_db, get_current_user
 from risk_engine import score_payment
+from routers.webhooks import fabric
 
 router = APIRouter(prefix="/payments", tags=["payments"])
 
@@ -168,6 +169,12 @@ async def payment_decision(payment_id: str, body: DecisionIn,
         "reason": body.reason,
     })
 
+    if new_status == "held":
+        await fabric.publish("payment.held", {
+            "payment_id": payment_id, "amount": p.get("amount"),
+            "vendor": p.get("vendor_name"), "risk_score": (p.get("risk") or {}).get("score"),
+        })
+
     # If fraud, auto-create incident
     if body.decision == "fraud":
         inc_id = str(uuid.uuid4())
@@ -183,6 +190,10 @@ async def payment_decision(payment_id: str, body: DecisionIn,
             "timeline": [{"at": now, "event": f"Fraud reported by {user['name']}"}],
             "people": [{"name": user["name"], "role": user["role"]}],
             "created_at": now,
+        })
+        await fabric.publish("incident.opened", {
+            "incident_id": inc_id, "payment_id": payment_id,
+            "amount_at_risk": p.get("amount"), "suspected_type": "Reported by user",
         })
 
     return {"ok": True, "new_status": new_status}
